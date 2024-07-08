@@ -3,12 +3,13 @@ This module takes care of starting the API Server, Loading the DB and Adding the
 """
 import os
 from flask import Flask, request, jsonify, url_for
+from sqlalchemy.exc import IntegrityError
 from flask_migrate import Migrate
 from flask_swagger import swagger
 from flask_cors import CORS
 from utils import APIException, generate_sitemap
 from admin import setup_admin
-from models import db, User, People , Planets , FavoritePeople, FavoritePlanets
+from models import db, User, People , Planets ,FavoritePeople,FavoritePlanets
 #from models import Person
 
 app = Flask(__name__)
@@ -48,7 +49,7 @@ def handle_user():
         }), 200
 
 
-@app.route('/users/<int:id>', methods=['GET'])
+@app.route('/user-id/<int:id>', methods=['GET'])
 def handle_user_id(id):
     
         user = User.query.get(id)
@@ -69,7 +70,7 @@ def handle_people():
             "data": people
         }), 200
     
-@app.route('/people/<int:id>', methods=['GET'])
+@app.route('/people-id/<int:id>', methods=['GET'])
 def handle_people_id(id):
     if request.method == 'GET':
         people = People.query.get(id)
@@ -90,7 +91,7 @@ def handle_planets():
             "data": planets
         }), 200
     
-@app.route('/planets/<int:id>', methods=['GET'])
+@app.route('/planet-id/<int:id>', methods=['GET'])
 def handle_planets_id(id):
         
         planets = Planets.query.get(id)
@@ -100,60 +101,70 @@ def handle_planets_id(id):
         }), 200   
 
 
-@app.route("/planets/favorite/<int:planet_id>", methods=["POST"])
-def post_fav_planet(planet_id):
-    one = Planets.query.get(planet_id)
+@app.route('/planets/favorite/<int:planets_id>', methods=["POST"])
+def post_fav_planet(planets_id):
+    one = Planets.query.get(planets_id)
     user = User.query.get(1)
-    if(one):
-        new_fav = FavoritePlanets()
-        new_fav.email = user.email
-        new_fav.planet_id = planet_id
-        db.session.add (new_fav)
+    if one is None:
+        return jsonify({"error": "The planet does not exist"}), 404
+
+    existing_favorite = FavoritePlanets.query.filter_by(user_id=user.id, planets_id=planets_id).first()
+    if existing_favorite:
+        return jsonify({"message": "Favorite already exists"}), 400
+
+    try:
+        new_fav = FavoritePlanets(user_id=user.id, planets_id=planets_id)
+        db.session.add(new_fav)
         db.session.commit()
-        return jsonify({
-        "message": "Favorite planet added"
-    })
-    else:
-        raise APIException("The planet not exist", status_code=404)
+        return jsonify({"message": "Favorite planet added"}), 201
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"error": "Failed to add favorite"}), 500
+    
 
 
 @app.route('/people/favorite/<int:people_id>', methods=["POST"])
 def post_fav_people(people_id):
     one = People.query.get(people_id)
     user = User.query.get(1)
-    if(one):
-        new_fav = FavoritePeople()
-        new_fav.email = user.email
-        new_fav.people_id = people_id
-        db.session.add (new_fav)
+    if one is None:
+        return jsonify({"error": "People not exist"}), 404
+
+    existing_favorite = FavoritePeople.query.filter_by(user_id=user.id, people_id=people_id).first()
+    if existing_favorite:
+        return jsonify({"message": "Favorite already exists"}), 400
+
+    try:
+        new_fav = FavoritePeople(user_id=user.id, people_id=people_id)
+        db.session.add(new_fav)
         db.session.commit()
-        return jsonify({
-        "message": "Favorite people added"
-    })
-    else:
-        raise APIException("People not exist", status_code=404)
+        return jsonify({"message": "Favorite people added"}), 201
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"error": "Failed to add favorite"}), 500
+    
 
 @app.route("/planets/favorite/<int:planet_id>", methods=["DELETE"])
 def delete_fav_planet(planet_id):
-    one = FavoritePlanets.query.filter_by(planet_id=planet_id).first()
+    one = FavoritePlanets.query.filter_by(planets_id=planet_id).first()
     if(one):
         db.session.delete(one)
         db.session.commit()
         return jsonify({
-        "message": "The planet with id" + str(planet_id) + "was dleted"
+        "message": "The planet with id=" + str(planet_id) + " was dleted"
     })
     else:
         raise APIException("The planet does not exist", status_code=404)
 
 
-@app.route("/favorite/people/<int:people_id>", methods=["DELETE"])
+@app.route("/people/favorite/<int:people_id>", methods=["DELETE"])
 def delete_fav_people(people_id):
     one = FavoritePeople.query.filter_by(people_id=people_id).first()
     if(one):
         db.session.delete(one)
         db.session.commit()
         return jsonify({
-        "mensaje": "People with id" + str(people_id) + "was deleted"
+        "mensaje": "People with id=" + str(people_id) + " was deleted"
     })
     else:
         raise APIException("People do not exist", status_code=404)
