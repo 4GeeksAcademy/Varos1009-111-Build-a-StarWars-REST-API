@@ -104,7 +104,7 @@ def handle_planets_id(id):
 @app.route('/planets/favorite/<int:planets_id>', methods=["POST"])
 def post_fav_planet(planets_id):
     one = Planets.query.get(planets_id)
-    user = User.query.get(1)
+    user = User.query.first()
     if one is None:
         return jsonify({"error": "The planet does not exist"}), 404
 
@@ -126,7 +126,7 @@ def post_fav_planet(planets_id):
 @app.route('/people/favorite/<int:people_id>', methods=["POST"])
 def post_fav_people(people_id):
     one = People.query.get(people_id)
-    user = User.query.get(1)
+    user = User.query.first()
     if one is None:
         return jsonify({"error": "People not exist"}), 404
 
